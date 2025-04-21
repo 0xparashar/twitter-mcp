@@ -1,71 +1,104 @@
 import { TwitterApi } from 'twitter-api-v2';
-import { Config, TwitterError, Tweet, TwitterUser, PostedTweet } from './types.js';
+import {
+  Config,
+  TwitterError,
+  Tweet,
+  TwitterUser,
+  PostedTweet,
+  SessionClient,
+} from "./types.js";
 
 export class TwitterClient {
-  private client: TwitterApi;
+  private mainClient: TwitterApi;
+  private client: SessionClient;
   private rateLimitMap = new Map<string, number>();
 
   constructor(config: Config) {
-    this.client = new TwitterApi({
-      appKey: config.apiKey,
-      appSecret: config.apiSecretKey,
-      accessToken: config.accessToken,
-      accessSecret: config.accessTokenSecret,
+    this.mainClient = new TwitterApi({
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
     });
 
-    console.error('Twitter API client initialized');
+    this.client = {
+      client: this.mainClient,
+      currentRefreshToken: config.refreshToken,
+      accessToken: "",
+      expiry: 0,
+    };
+
+    console.error("Twitter API client initialized");
+  }
+
+  async init(config: Config): Promise<void> {
+    const result = await this.mainClient.refreshOAuth2Token(
+      config.refreshToken
+    );
+    console.error("OAuth2 token refreshed");
+    console.log("Expires in:", result.expiresIn);
+    const currentTime = Date.now() / 1000;
+    this.client = {
+      client: result.client,
+      currentRefreshToken: result.refreshToken ?? "",
+      accessToken: result.accessToken,
+      expiry: currentTime + result.expiresIn,
+    };
   }
 
   async postTweet(text: string): Promise<PostedTweet> {
     try {
-      const endpoint = 'tweets/create';
+      const endpoint = "tweets/create";
       await this.checkRateLimit(endpoint);
 
-      const response = await this.client.v2.tweet(text);
-      
+      const response = await this.client.client.v2.tweet(text);
+
       console.error(`Tweet posted successfully with ID: ${response.data.id}`);
-      
+
       return {
         id: response.data.id,
-        text: response.data.text
+        text: response.data.text,
       };
     } catch (error) {
       this.handleApiError(error);
     }
   }
 
-  async searchTweets(query: string, count: number): Promise<{ tweets: Tweet[], users: TwitterUser[] }> {
+  async searchTweets(
+    query: string,
+    count: number
+  ): Promise<{ tweets: Tweet[]; users: TwitterUser[] }> {
     try {
-      const endpoint = 'tweets/search';
+      const endpoint = "tweets/search";
       await this.checkRateLimit(endpoint);
 
-      const response = await this.client.v2.search(query, {
+      const response = await this.client.client.v2.search(query, {
         max_results: count,
-        expansions: ['author_id'],
-        'tweet.fields': ['public_metrics', 'created_at'],
-        'user.fields': ['username', 'name', 'verified']
+        expansions: ["author_id"],
+        "tweet.fields": ["public_metrics", "created_at"],
+        "user.fields": ["username", "name", "verified"],
       });
 
-      console.error(`Fetched ${response.tweets.length} tweets for query: "${query}"`);
+      console.error(
+        `Fetched ${response.tweets.length} tweets for query: "${query}"`
+      );
 
-      const tweets = response.tweets.map(tweet => ({
+      const tweets = response.tweets.map((tweet) => ({
         id: tweet.id,
         text: tweet.text,
-        authorId: tweet.author_id ?? '',
+        authorId: tweet.author_id ?? "",
         metrics: {
           likes: tweet.public_metrics?.like_count ?? 0,
           retweets: tweet.public_metrics?.retweet_count ?? 0,
           replies: tweet.public_metrics?.reply_count ?? 0,
-          quotes: tweet.public_metrics?.quote_count ?? 0
+          quotes: tweet.public_metrics?.quote_count ?? 0,
         },
-        createdAt: tweet.created_at ?? ''
+        createdAt: tweet.created_at ?? "",
       }));
 
-      const users = response.includes.users.map(user => ({
+      const users = response.includes.users.map((user) => ({
         id: user.id,
         username: user.username,
         name: user.name,
-        verified: user.verified ?? false
+        verified: user.verified ?? false,
       }));
 
       return { tweets, users };
@@ -78,15 +111,33 @@ export class TwitterClient {
     const lastRequest = this.rateLimitMap.get(endpoint);
     if (lastRequest) {
       const timeSinceLastRequest = Date.now() - lastRequest;
-      if (timeSinceLastRequest < 1000) { // Basic rate limiting
+      if (timeSinceLastRequest < 1000) {
+        // Basic rate limiting
         throw new TwitterError(
-          'Rate limit exceeded',
-          'rate_limit_exceeded',
+          "Rate limit exceeded",
+          "rate_limit_exceeded",
           429
         );
       }
     }
     this.rateLimitMap.set(endpoint, Date.now());
+  }
+
+  private async checkAndRefreshToken(): Promise<void> {
+    const now = Date.now() / 1000;
+    if (now >= this.client.expiry) {
+      const result = await this.mainClient.refreshOAuth2Token(
+        this.client.currentRefreshToken
+      );
+      console.error("OAuth2 token refreshed");
+      console.log("Expires in:", result.expiresIn);
+      this.client = {
+        client: result.client,
+        currentRefreshToken: result.refreshToken ?? "",
+        accessToken: result.accessToken,
+        expiry: now + result.expiresIn,
+      };
+    }
   }
 
   private handleApiError(error: unknown): never {
@@ -98,17 +149,17 @@ export class TwitterClient {
     const apiError = error as any;
     if (apiError.code) {
       throw new TwitterError(
-        apiError.message || 'Twitter API error',
+        apiError.message || "Twitter API error",
         apiError.code,
         apiError.status
       );
     }
 
     // Handle unexpected errors
-    console.error('Unexpected error in Twitter client:', error);
+    console.error("Unexpected error in Twitter client:", error);
     throw new TwitterError(
-      'An unexpected error occurred',
-      'internal_error',
+      "An unexpected error occurred",
+      "internal_error",
       500
     );
   }
