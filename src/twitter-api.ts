@@ -46,6 +46,8 @@ export class TwitterClient {
 
   async postTweet(text: string): Promise<PostedTweet> {
     try {
+      await this.checkAndRefreshToken();
+
       const endpoint = "tweets/create";
       await this.checkRateLimit(endpoint);
 
@@ -67,6 +69,8 @@ export class TwitterClient {
     count: number
   ): Promise<{ tweets: Tweet[]; users: TwitterUser[] }> {
     try {
+      await this.checkAndRefreshToken();
+
       const endpoint = "tweets/search";
       await this.checkRateLimit(endpoint);
 
