@@ -1,5 +1,5 @@
 {
-  "name": "@enescinar/twitter-mcp",
+  "name": "@0xparashar/twitter-mcp",
   "version": "0.1.0",
   "description": "A Model Context Protocol server allows to interact with Twitter, enabling posting tweets and searching Twitter.",
   "type": "module",
@@ -23,7 +23,7 @@
     "twitter",
     "claude"
   ],
-  "author": "Enes Cinar",
+  "author": "Ankit Parashar",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
@@ -37,10 +37,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnesCinr/twitter-mcp.git"
+    "url": "git+https://github.com/0xparashar/twitter-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/EnesCinr/twitter-mcp/issues"
+    "url": "https://github.com/0xparashar/twitter-mcp/issues"
   },
-  "homepage": "https://github.com/EnesCinr/twitter-mcp#readme"
+  "homepage": "https://github.com/0xparashar/twitter-mcp#readme"
 }
