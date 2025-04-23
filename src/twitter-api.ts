@@ -133,11 +133,10 @@ export class TwitterClient {
       const result = await this.mainClient.refreshOAuth2Token(
         this.client.currentRefreshToken
       );
-      console.error("OAuth2 token refreshed");
-      console.log("Expires in:", result.expiresIn);
+
       this.client = {
         client: result.client,
-        currentRefreshToken: result.refreshToken ?? "",
+        currentRefreshToken: this.client.currentRefreshToken,
         accessToken: result.accessToken,
         expiry: now + result.expiresIn,
       };
